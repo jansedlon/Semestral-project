@@ -109,23 +109,23 @@ const App = () => {
 
     loadGraph(graph);
 
-    registerEvents({
-      // enterNode: ({ node }) => setHoveredNode(node),
-      clickNode: ({ node }) => {
-        if (initiallyInfluencedNodes.includes(node)) {
-          setInitiallyInfluencedNodes((prev) => prev.filter((n) => n !== node));
-        } else if (initiallyInfluencedNodes.length <= 2) {
-          setInitiallyInfluencedNodes((prev) => [...prev, node]);
-        }
-      },
-      // leaveNode: () => setHoveredNode(null),
-    });
-
     setInfo({
       numberOfNodes: graph.nodes().length,
       numberOfEdges: graph.edges().length,
     });
   }, []);
+
+  useEffect(() => {
+    registerEvents({
+      clickNode: ({ node }) => {
+        if (initiallyInfluencedNodes.includes(node)) {
+          setInitiallyInfluencedNodes((prev) => prev.filter((n) => n !== node));
+        } else {
+          setInitiallyInfluencedNodes((prev) => [...prev, node]);
+        }
+      },
+    });
+  }, [initiallyInfluencedNodes]);
 
   useEffect(() => {
     setSettings((prev) => ({

@@ -26,7 +26,7 @@ export const useRegisterEvents = () => {
   );
 
   useEffect(() => {
-    if (!sigma || !eventHandlers) return;
+    if (!sigma || !eventHandlers) return () => {};
 
     Object.entries(eventHandlers).forEach(([eventName, eventHandler]) => {
       if (eventName === "cameraUpdated") {
