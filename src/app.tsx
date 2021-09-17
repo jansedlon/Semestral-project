@@ -4,7 +4,7 @@ import Graph, { UndirectedGraph } from "graphology";
 import gexf from "graphology-gexf/browser";
 // @ts-ignore
 import graphml from "graphology-graphml/browser";
-import { Attributes, NodeKey } from "graphology-types";
+import { Attributes, EdgeKey, NodeKey } from "graphology-types";
 // @ts-ignore
 import data from "../got-network.graphml";
 import {
@@ -13,13 +13,20 @@ import {
   useSettings,
   useSigma,
 } from "./hooks";
+import {
+  EDGE_INFLUENCED_COLOR,
+  NODE_DEFAULT_COLOR,
+  NODE_INFLUENCED_COLOR,
+  NODE_INFLUENCING_COLOR,
+} from "./consts";
 
 function calculateIndependentCascadeModel(
   graph: Graph,
   initialNodes: NodeKey[],
   probability: number
-): NodeKey[] {
+): [nodes: NodeKey[], edges: EdgeKey[]] {
   const influencedNodes = new Set<NodeKey>(initialNodes);
+  const edges = new Set<EdgeKey>();
   const visitedNodes = new Set<NodeKey>();
 
   const process = (nodes: NodeKey[]) => {
@@ -42,6 +49,12 @@ function calculateIndependentCascadeModel(
         () => Math.random() <= probability
       );
 
+      // Insert edges between current node and newly influenced nodes to the edges array
+      newlyInfluencedNodes.forEach((influencedNode) => {
+        const edge = graph.edge(node, influencedNode)!;
+        edges.add(edge);
+      });
+
       // Add them to the array
       newlyInfluencedNodes.forEach((influencedNode) =>
         influencedNodes.add(influencedNode)
@@ -54,7 +67,7 @@ function calculateIndependentCascadeModel(
 
   process(initialNodes);
 
-  return Array.from(influencedNodes);
+  return [Array.from(influencedNodes), Array.from(edges)];
 }
 
 const App = () => {
@@ -69,6 +82,9 @@ const App = () => {
     NodeKey[]
   >([]);
   const [influencedNodes, setInfluencedNodes] = useState<NodeKey[] | null>(
+    null
+  );
+  const [influencedEdges, setInfluencedEdges] = useState<NodeKey[] | null>(
     null
   );
 
@@ -87,7 +103,7 @@ const App = () => {
       graph.mergeNodeAttributes(node, {
         label: node,
         size: 10,
-        color: "#AAAAAA",
+        color: NODE_DEFAULT_COLOR,
       });
     });
 
@@ -118,7 +134,7 @@ const App = () => {
         const newAttrs: Attributes = { ...attrs };
 
         if (initiallyInfluencedNodes.includes(node)) {
-          newAttrs.color = "#ff0000";
+          newAttrs.color = NODE_INFLUENCING_COLOR;
         }
 
         return newAttrs;
@@ -127,52 +143,53 @@ const App = () => {
   }, [initiallyInfluencedNodes]);
 
   const handleCalculating = () => {
-    console.log(
-      calculateIndependentCascadeModel(
-        sigma.getGraph(),
-        initiallyInfluencedNodes,
-        probability
-      )
+    const calculation = calculateIndependentCascadeModel(
+      sigma.getGraph(),
+      initiallyInfluencedNodes,
+      probability
     );
-    setInfluencedNodes(
-      calculateIndependentCascadeModel(
-        sigma.getGraph(),
-        initiallyInfluencedNodes,
-        probability
-      )
-    );
-    // setCalculatedSteps(
-    //   calculateIndependentCascadeModel(
-    //     sigma.getGraph(),
-    //     initiallyInfluencedNodes,
-    //     0.5
-    //   )
-    // );
+    setInfluencedNodes(calculation[0]);
+    setInfluencedEdges(calculation[1]);
   };
 
   useEffect(() => {
-    if (influencedNodes) {
-      setSettings({
-        nodeReducer: (node, attrs) => {
-          const newAttrs: Attributes = { ...attrs };
+    setSettings({
+      nodeReducer: (node, attrs) => {
+        const newAttrs: Attributes = { ...attrs };
 
-          if (influencedNodes.includes(node)) {
-            newAttrs.color = "#46c800";
-          }
+        if (!influencedNodes) return newAttrs;
 
+        if (influencedNodes.includes(node)) {
+          newAttrs.color = NODE_INFLUENCED_COLOR;
+        }
+
+        return newAttrs;
+      },
+      edgeReducer: (edge, attrs) => {
+        const newAttrs: Attributes = { ...attrs };
+
+        if (!influencedEdges) {
+          // newAttrs.color = EDGE_DEFAULT_COLOR;
           return newAttrs;
-        },
-      });
-    }
-  }, [influencedNodes]);
+        }
+
+        if (influencedEdges.includes(edge)) {
+          newAttrs.color = EDGE_INFLUENCED_COLOR;
+          newAttrs.size = 2;
+          newAttrs.zIndex = 2;
+        }
+
+        return newAttrs;
+      },
+    });
+  }, [influencedNodes, influencedEdges]);
 
   return (
     <>
-      <div className="absolute flex flex-col top-0 left-0 z-50">
-        <span className="text-red-900 text-4xl">
-          Number of nodes: {info.numberOfNodes}
-          <br />
-          Number of edges: {info.numberOfEdges}
+      <div className="absolute flex flex-col space-y-2 top-2 left-2 z-50">
+        <span className="text-red-900 text-4xl flex flex-col space-y-2">
+          <span>Number of nodes: {info.numberOfNodes}</span>
+          <span>Number of edges: {info.numberOfEdges}</span>
         </span>
         <label className="text-red-900 text-4xl">
           Probability
@@ -186,17 +203,21 @@ const App = () => {
           />
           {probability}
         </label>
-      </div>
-      <div className="absolute bottom-0 right-0 z-50">
         {!influencedNodes ? (
-          <button onClick={handleCalculating} type="button">
+          <button
+            onClick={handleCalculating}
+            type="button"
+            className="inline-flex justify-center items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
             Start calculating
           </button>
         ) : (
           <button
             type="button"
+            className="inline-flex justify-center items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             onClick={() => {
               setInfluencedNodes(null);
+              setInfluencedEdges(null);
               setInitiallyInfluencedNodes([]);
             }}
           >
