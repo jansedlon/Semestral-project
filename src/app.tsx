@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from "react";
 import circlepackLayout from "graphology-layout/circlepack";
+import forceAtlas2, {
+  ForceAtlas2Settings,
+} from "graphology-layout-forceatlas2";
 import Graph, { UndirectedGraph } from "graphology";
 import gexf from "graphology-gexf/browser";
 // @ts-ignore
@@ -27,7 +30,7 @@ function calculateIndependentCascadeModel(
 ): [nodes: NodeKey[], edges: EdgeKey[]] {
   const influencedNodes = new Set<NodeKey>(initialNodes);
   const edges = new Set<EdgeKey>();
-  const visitedNodes = new Set<NodeKey>();
+  // const visitedNodes = new Set<NodeKey>();
 
   const process = (nodes: NodeKey[]) => {
     let newlyInfluencedNodes: NodeKey[] = [];
@@ -35,14 +38,12 @@ function calculateIndependentCascadeModel(
     // Iterate through all given nodes
     nodes.forEach((node) => {
       // Get neighbors of a node, but not ones that have been already influenced or visited
-      const neighbors = graph
-        .neighbors(node)
-        .filter(
-          (neighbor) =>
-            !influencedNodes.has(neighbor) && !visitedNodes.has(neighbor)
-        );
+      const neighbors = graph.neighbors(node).filter(
+        (neighbor) => !influencedNodes.has(neighbor)
+        //  && !visitedNodes.has(neighbor)
+      );
       // Mark them as visited
-      neighbors.forEach((neighbor) => visitedNodes.add(neighbor));
+      // neighbors.forEach((neighbor) => visitedNodes.add(neighbor));
 
       // Mark some of them as influenced. The number is determined by a probability
       newlyInfluencedNodes = neighbors.filter(
@@ -76,6 +77,11 @@ const App = () => {
   const loadGraph = useLoadGraph();
   const setSettings = useSettings();
 
+  const [forceAtlasOptions, setForceAtlasOptions] =
+    useState<ForceAtlas2Settings>({
+      gravity: 1,
+      scalingRatio: 2,
+    });
   const [info, setInfo] = useState({ numberOfNodes: 0, numberOfEdges: 0 });
   const [probability, setProbability] = useState(0.3);
   const [initiallyInfluencedNodes, setInitiallyInfluencedNodes] = useState<
@@ -89,20 +95,23 @@ const App = () => {
   );
 
   useEffect(() => {
-    // invoke("my_custom_command", { invokeMessage: "message" })
-    //   .then()
-    //   .catch((err) => console.log(err));
-    // const graph = gexf.parse(UndirectedGraph, data);
     const graph: Graph<Attributes, Attributes, Attributes> = graphml.parse(
       UndirectedGraph,
       data
     );
-    circlepackLayout.assign(graph);
+
+    forceAtlas2.assign(graph, {
+      iterations: 50,
+      settings: forceAtlasOptions,
+    });
+    // circlepackLayout.assign(graph);
 
     graph.nodes().forEach((node) => {
       graph.mergeNodeAttributes(node, {
         label: node,
         size: 10,
+        x: Math.random() * 100,
+        y: Math.random() * 100,
         color: NODE_DEFAULT_COLOR,
       });
     });
@@ -184,6 +193,15 @@ const App = () => {
     });
   }, [influencedNodes, influencedEdges]);
 
+  useEffect(() => {
+    if (sigma.getGraph()) {
+      forceAtlas2.assign(sigma.getGraph(), {
+        iterations: 50,
+        settings: forceAtlasOptions,
+      });
+    }
+  }, [forceAtlasOptions]);
+
   return (
     <>
       <div className="absolute flex flex-col space-y-2 top-2 left-2 z-50">
@@ -224,6 +242,148 @@ const App = () => {
             Reset
           </button>
         )}
+        {/* linLogMode?: boolean,
+  outboundAttractionDistribution?: boolean,
+  adjustSizes?: boolean,
+  edgeWeightInfluence?: number,
+  scalingRatio?: number,
+  strongGravityMode?: boolean,
+  gravity?: number,
+  slowDown?: number,
+  barnesHutOptimize?: boolean,
+  barnesHutTheta?: number */}
+        <label className="text-red-900 text-4xl">
+          Linlog mode
+          <input
+            type="checkbox"
+            checked={forceAtlasOptions.linLogMode}
+            onChange={() =>
+              setForceAtlasOptions((prev) => ({
+                ...prev,
+                linLogMode: !prev.linLogMode,
+              }))
+            }
+            value={probability}
+          />
+        </label>
+        <label className="text-red-900 text-4xl">
+          Outbound attraction distribution
+          <input
+            type="checkbox"
+            checked={forceAtlasOptions.outboundAttractionDistribution}
+            onChange={() =>
+              setForceAtlasOptions((prev) => ({
+                ...prev,
+                outboundAttractionDistribution:
+                  !prev.outboundAttractionDistribution,
+              }))
+            }
+          />
+        </label>
+        <label className="text-red-900 text-4xl">
+          Adjust sizes
+          <input
+            type="checkbox"
+            checked={!!forceAtlasOptions.adjustSizes}
+            onChange={() =>
+              setForceAtlasOptions((prev) => ({
+                ...prev,
+                adjustSizes: !prev.adjustSizes,
+              }))
+            }
+          />
+        </label>
+        <label className="text-red-900 text-4xl">
+          Edge weight influence
+          <input
+            type="number"
+            value={forceAtlasOptions.edgeWeightInfluence ?? 0}
+            onChange={(e) =>
+              setForceAtlasOptions((prev) => ({
+                ...prev,
+                edgeWeightInfluence: +e.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className="text-red-900 text-4xl">
+          Scaling ratio
+          <input
+            type="number"
+            value={forceAtlasOptions.scalingRatio ?? 1}
+            onChange={(e) =>
+              setForceAtlasOptions((prev) => ({
+                ...prev,
+                scalingRatio: +e.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className="text-red-900 text-4xl">
+          Strong gravity mode
+          <input
+            type="checkbox"
+            checked={!!forceAtlasOptions.strongGravityMode}
+            onChange={() =>
+              setForceAtlasOptions((prev) => ({
+                ...prev,
+                strongGravityMode: !prev.strongGravityMode,
+              }))
+            }
+          />
+        </label>
+        <label className="text-red-900 text-4xl">
+          Gravity
+          <input
+            type="number"
+            value={forceAtlasOptions.gravity ?? 1}
+            onChange={(e) =>
+              setForceAtlasOptions((prev) => ({
+                ...prev,
+                gravity: +e.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className="text-red-900 text-4xl">
+          Slow down
+          <input
+            type="number"
+            value={forceAtlasOptions.slowDown ?? 1}
+            onChange={(e) =>
+              setForceAtlasOptions((prev) => ({
+                ...prev,
+                slowDown: +e.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className="text-red-900 text-4xl">
+          Barnes hut optimize
+          <input
+            type="checkbox"
+            checked={!!forceAtlasOptions.barnesHutOptimize}
+            onChange={() =>
+              setForceAtlasOptions((prev) => ({
+                ...prev,
+                barnesHutOptimize: !prev.barnesHutOptimize,
+              }))
+            }
+          />
+        </label>
+        <label className="text-red-900 text-4xl">
+          Barnes hut theta
+          <input
+            type="number"
+            value={forceAtlasOptions.barnesHutTheta ?? 0.5}
+            onChange={(e) =>
+              setForceAtlasOptions((prev) => ({
+                ...prev,
+                barnesHutTheta: +e.target.value,
+              }))
+            }
+          />
+        </label>
       </div>
     </>
   );
